@@ -3,6 +3,7 @@
 #include <lib.h>
 #include <moduleLoader.h>
 #include <naiveConsole.h>
+#include <interruptions.h>
 
 extern uint8_t text;
 extern uint8_t rodata;
@@ -80,25 +81,38 @@ void * initializeKernelBinary()
 	return getStackBase();
 }
 
+static int i = 0;
+char *video = (char *) 0xB8000;
+
+void tickHandler() {
+	video[i++] = i;	
+}
+
+void sti();
+void irq0Handler();
+void setPicMaster(uint16_t);
+
+typedef void (*handler_t)(void);
+
+handler_t handlers[] = {tickHandler};
+
+void irqDispatcher(int irq) {
+	handlers[irq]();
+}
+
 int main()
 {	
-	ncPrint("[Kernel Main]");
-	ncNewline();
-	ncPrint("  Sample code module at 0x");
-	ncPrintHex((uint64_t)sampleCodeModuleAddress);
-	ncNewline();
-	ncPrint("  Calling the sample code module returned: ");
-	ncPrintHex(((EntryPoint)sampleCodeModuleAddress)());
-	ncNewline();
-	ncNewline();
+	iSetHandler(0x20, (uint64_t) irq0Handler);
+	
+	setPicMaster(0xFE);
+	
+	sti();
 
-	ncPrint("  Sample data module at 0x");
-	ncPrintHex((uint64_t)sampleDataModuleAddress);
-	ncNewline();
-	ncPrint("  Sample data module contents: ");
-	ncPrint((char*)sampleDataModuleAddress);
-	ncNewline();
-
-	ncPrint("[Finished]");
-	return 0;
+	while (1) {
+		int k = 0;
+		while(k < 1000*1000*20) {
+			k++;
+		}
+		ncPrintHex(i);
+	}
 }
